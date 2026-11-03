@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobMatch AI · 悬浮求职助手</title>
+  <style>
+    /* 彻底取消高度限制，靠内容自己撑开，永远不缩水 */
+    #jobmatch-panel-root {
+      position: fixed;
+      top: 50px;
+      right: 50px;
+      width: 480px;          /* 足够宽 */
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0,0,0,0.05);
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #1e293b;
+      z-index: 999999;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;      /* 防止圆角被内部元素破坏 */
+    }
+
+    #jobmatch-panel-root * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    .jm-header {
+      padding: 16px 20px;
+      background: #0f172a;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: grab;
+    }
+
+    .jm-header h3 {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .jm-header h3 span {
+      background: #3b82f6;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .jm-close-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .jm-close-btn:hover { color: white; }
+
+    .jm-tabs {
+      display: flex;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .jm-tab {
+      flex: 1;
+      text-align: center;
+      padding: 14px 0;
+      font-weight: 600;
+      font-size: 14px;
+      color: #64748b;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+
+    .jm-tab.active {
+      color: #0f172a;
+      border-bottom-color: #3b82f6;
+      background: white;
+    }
+
+    .jm-panel-content {
+      padding: 20px;
+      max-height: 75vh;      /* 如果内容太多，内部自己滚动，不撑爆屏幕 */
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .jm-section {
+      background: #ffffff;
+      margin-bottom: 24px;
+    }
+
+    .jm-section-title {
+      font-weight: 700;
+      font-size: 15px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #0f172a;
+    }
+
+    .jm-badge {
+      background: #f1f5f9;
+      color: #475569;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .jm-btn {
+      background: white;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      color: #334155;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .jm-btn:hover { background: #f8fafc; }
+
+    .jm-btn-primary {
+      background: #3b82f6;
+      border-color: #3b82f6;
+      color: white;
+    }
+
+    .jm-btn-primary:hover { background: #2563eb; }
+
+    .jm-btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    .jm-input, .jm-textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      background: #f8fafc;
+      transition: border-color 0.2s;
+      margin-bottom: 12px;
+    }
+
+    .jm-input:focus, .jm-textarea:focus {
+      outline: none;
+      border-color: #3b82f6;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .jm-textarea { 
+      resize: vertical; 
+      min-height: 120px;
+      line-height: 1.5;
+    }
+
+    .jm-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .jm-job-card {
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .jm-job-title {
+      font-weight: 600;
+      font-size: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      color: #0f172a;
+      gap: 10px;
+    }
+
+    .jm-job-company {
+      color: #64748b;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .jm-job-score {
+      background: #dcfce7;
+      color: #166534;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .jm-risk-tag {
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background: #fef9c3;
+      color: #854d0e;
+      font-weight: 600;
+    }
+
+    .jm-flex {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .jm-text-muted {
+      color: #64748b;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .jm-tag {
+      background: #e0e7ff;
+      color: #3730a3;
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-block;
+    }
+
+    #jobmatch-fab {
+      position: fixed;
+      bottom: 40px;
+      right: 40px;
+      width: 60px;
+      height: 60px;
+      background: #0f172a;
+      border-radius: 30px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 999998;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    #jobmatch-fab:hover {
+      background: #1e293b;
+      transform: scale(1.05);
+    }
+
+    .jm-hidden { display: none !important; }
+
+    .jm-panel-content::-webkit-scrollbar { width: 6px; }
+    .jm-panel-content::-webkit-scrollbar-track { background: transparent; }
+    .jm-panel-content::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body style="margin:0; background: transparent;">
+
+  <button id="jobmatch-fab" title="打开 JobMatch AI">JM</button>
+
+  <div id="jobmatch-panel-root" class="jm-hidden">
+    <div class="jm-header" id="jm-drag-handle">
+      <h3>JobMatch AI <span>MVP</span></h3>
+      <button class="jm-close-btn" id="jm-close-panel">✕</button>
+    </div>
+
+    <div class="jm-tabs">
+      <div class="jm-tab active" data-tab="profile">📄 简历</div>
+      <div class="jm-tab" data-tab="match">🎯 匹配</div>
+      <div class="jm-tab" data-tab="risk">⚠️ 风控</div>
+      <div class="jm-tab" data-tab="history">📋 记录</div>
+    </div>
+
+    <div class="jm-panel-content" id="jm-panel-content">
+      <!-- 内容由 JS 动态渲染 -->
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const STORAGE_KEY = 'jobmatch_ai_mvp_data';
+      const DEFAULT_DATA = {
+        resume: { rawText: '', keywords: '', hardFilters: '' },
+        jobs: [
+          { id: 'j1', title: '高级前端工程师', company: '字节跳动', score: 92, risk: 'low', riskNote: '成立12年，规模10000+，经营正常', viewed: false, collected: false, applied: false, contacted: false, jd: 'React, TypeScript, 性能优化, 微前端' },
+          { id: 'j2', title: '全栈开发工程师', company: '美团', score: 78, risk: 'unknown', riskNote: '招聘信息较少，规模未知，建议进一步核实', viewed: false, collected: false, applied: false, contacted: false, jd: 'Node.js, Java, 分布式, 高并发' },
+          { id: 'j3', title: 'React 开发工程师', company: '蚂蚁集团', score: 85, risk: 'low', riskNote: '成立20年，规模5000+，招聘活跃', viewed: false, collected: false, applied: false, contacted: false, jd: 'React, Redux, 前端工程化, 数据可视化' }
+        ],
+        selectedJobId: 'j1'
+      };
+
+      function loadData() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) { try { return JSON.parse(stored); } catch (e) {} }
+        return JSON.parse(JSON.stringify(DEFAULT_DATA));
+      }
+      function saveData(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+
+      let appData = loadData();
+      let currentTab = 'profile';
+
+      const fab = document.getElementById('jobmatch-fab');
+      const panel = document.getElementById('jobmatch-panel-root');
+      const closeBtn = document.getElementById('jm-close-panel');
+      const contentDiv = document.getElementById('jm-panel-content');
+      const tabs = document.querySelectorAll('.jm-tab');
+
+      fab.addEventListener('click', () => {
+        panel.classList.remove('jm-hidden');
+        fab.classList.add('jm-hidden');
+        renderContent();
+      });
+
+      closeBtn.addEventListener('click', () => {
+        panel.classList.add('jm-hidden');
+        fab.classList.remove('jm-hidden');
+      });
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+          const tabName = tab.dataset.tab;
+          if (!tabName) return;
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          currentTab = tabName;
+          renderContent();
+        });
+      });
+
+      // 拖拽
+      let isDragging = false;
+      let dragOffsetX, dragOffsetY;
+      const header = document.querySelector('.jm-header');
+      header.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.jm-close-btn')) return;
+        isDragging = true;
+        const rect = panel.getBoundingClientRect();
+        dragOffsetX = e.clientX - rect.left;
+        dragOffsetY = e.clientY - rect.top;
+        panel.style.cursor = 'grabbing';
+        e.preventDefault();
+      });
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        let newX = e.clientX - dragOffsetX;
+        let newY = e.clientY - dragOffsetY;
+        newX = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, newX));
+        newY = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, newY));
+        panel.style.left = newX + 'px';
+        panel.style.top = newY + 'px';
+        panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+      });
+      document.addEventListener('mouseup', () => {
+        if (isDragging) { isDragging = false; panel.style.cursor = 'default'; }
+      });
+
+      function renderContent() {
+        if (currentTab === 'profile') renderProfile();
+        else if (currentTab === 'match') renderMatch();
+        else if (currentTab === 'risk') renderRisk();
+        else if (currentTab === 'history') renderHistory();
+      }
+
+      function renderProfile() {
+        const resume = appData.resume || {};
+        contentDiv.innerHTML = `
+          <div class="jm-section">
+            <div class="jm-section-title">
+              <span>📄 个人求职档案</span>
+              <span class="jm-badge">本地存储</span>
+            </div>
+            <div class="jm-row" style="margin-bottom: 12px;">
+              <button class="jm-btn jm-btn-sm" id="jm-upload-pdf">📎 上传 PDF 简历</button>
+              <button class="jm-btn jm-btn-sm" id="jm-read-boss">📋 读取 BOSS 简历</button>
+            </div>
+            <div class="jm-text-muted" style="margin-bottom: 8px;">或者手动粘贴简历内容</div>
+            <textarea class="jm-textarea" id="jm-resume-text" rows="6" placeholder="粘贴简历全文...">${escapeHtml(resume.rawText || '')}</textarea>
+            <input class="jm-input" id="jm-keywords" placeholder="求职关键词 (逗号分隔)" value="${escapeHtml(resume.keywords || '')}">
+            <input class="jm-input" id="jm-hardfilters" placeholder="硬性筛选条件 (如: 北京, 本科)" value="${escapeHtml(resume.hardFilters || '')}">
+            <button class="jm-btn jm-btn-primary" id="jm-save-profile" style="width:100%; margin-top: 4px;">保存档案</button>
+          </div>
+        `;
+        document.getElementById('jm-save-profile').addEventListener('click', () => {
+          appData.resume = {
+            rawText: document.getElementById('jm-resume-text').value,
+            keywords: document.getElementById('jm-keywords').value,
+            hardFilters: document.getElementById('jm-hardfilters').value
+          };
+          saveData(appData);
+          alert('简历档案已保存到本地');
+        });
+        document.getElementById('jm-upload-pdf').addEventListener('click', () => {
+          const input = document.createElement('input');
+          input.type = 'file'; input.accept = '.pdf,.doc,.docx';
+          input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            alert(`已接收文件: ${file.name} (MVP版本暂不解析PDF，请手动粘贴文本)`);
+          };
+          input.click();
+        });
+        document.getElementById('jm-read-boss').addEventListener('click', () => {
+          document.getElementById('jm-resume-text').value = '张三 · 前端开发\n5年经验 · 本科 · 北京\n技能: React, Vue, TypeScript, Node.js';
+          alert('已模拟读取 BOSS 在线简历（MVP演示）');
+        });
+      }
+
+      function renderMatch() {
+        const jobs = appData.jobs || [];
+        const resume = appData.resume || {};
+        const keywords = (resume.keywords || '').toLowerCase().split(',').map(k => k.trim()).filter(Boolean);
+
+        const jobsWithScore = jobs.map(job => {
+          let score = job.score || 50;
+          if (keywords.length > 0) {
+            const jdLower = (job.jd || '').toLowerCase();
+            const matched = keywords.filter(k => jdLower.includes(k) || (job.title || '').toLowerCase().includes(k)).length;
+            if (matched > 0) score = Math.min(100, score + matched * 5);
+            else score = Math.max(40, score - 10);
+          }
+          return { ...job, score };
+        }).sort((a, b) => b.score - a.score);
+
+        appData.jobs = jobsWithScore;
+
+        contentDiv.innerHTML = `
+          <div class="jm-section">
+            <div class="jm-section-title">
+              <span>🎯 智能岗位匹配</span>
+              <span class="jm-badge">${jobsWithScore.length} 个岗位</span>
+            </div>
+            <div id="jm-match-list">
+              ${jobsWithScore.map(job => `
+                <div class="jm-job-card" data-jobid="${job.id}">
+                  <div class="jm-job-title">
+                    <span>${escapeHtml(job.title)}</span>
+                    <span class="jm-job-score">${job.score}分</span>
+                  </div>
+                  <div class="jm-job-company">${escapeHtml(job.company)} · ${job.risk === 'low' ? '✅ 低风险' : job.risk === 'unknown' ? '❓ 信息不全' : '⚠️ 需注意'}</div>
+                  <div class="jm-flex" style="margin-top:12px;">
+                    <button class="jm-btn jm-btn-sm jm-select-job" data-id="${job.id}">选中</button>
+                    <button class="jm-btn jm-btn-sm jm-gen-greeting" data-id="${job.id}">💬 生成招呼语</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div class="jm-section" style="margin-top: 24px;">
+            <div class="jm-section-title">📝 当前选中岗位</div>
+            <div id="jm-selected-job-info">${getSelectedJobInfo()}</div>
+            <div class="jm-row" style="margin-top:16px;">
+              <button class="jm-btn jm-btn-primary" id="jm-copy-greeting" style="flex:1;">📋 复制招呼语</button>
+            </div>
+            <div id="jm-greeting-preview" style="margin-top:12px; font-size:13px; background:#f8fafc; border:1px dashed #cbd5e1; padding:12px; border-radius:8px; color:#334155; min-height:60px; line-height:1.5;"></div>
+          </div>
+        `;
+
+        document.querySelectorAll('.jm-select-job').forEach(btn => {
+          btn.addEventListener('click', () => {
+            appData.selectedJobId = btn.dataset.id;
+            saveData(appData);
+            renderMatch();
+          });
+        });
+        document.querySelectorAll('.jm-gen-greeting').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const job = appData.jobs.find(j => j.id === btn.dataset.id);
+            if (!job) return;
+            const greeting = generateGreeting(job);
+            appData.selectedJobId = job.id;
+            saveData(appData);
+            renderMatch();
+            document.getElementById('jm-greeting-preview').innerText = greeting;
+          });
+        });
+        document.getElementById('jm-copy-greeting')?.addEventListener('click', () => {
+          const preview = document.getElementById('jm-greeting-preview');
+          if (preview) {
+            navigator.clipboard.writeText(preview.innerText).then(() => alert('招呼语已复制到剪贴板'))
+            .catch(() => {
+              const textarea = document.createElement('textarea');
+              textarea.value = preview.innerText;
+              document.body.appendChild(textarea); textarea.select(); document.execCommand('copy'); document.body.removeChild(textarea);
+              alert('已复制');
+            });
+          }
+        });
+
+        const selectedJob = appData.jobs.find(j => j.id === appData.selectedJobId);
+        if (selectedJob) {
+          document.getElementById('jm-greeting-preview').innerText = generateGreeting(selectedJob);
+        }
+      }
+
+      function getSelectedJobInfo() {
+        const job = appData.jobs.find(j => j.id === appData.selectedJobId);
+        if (!job) return '<div class="jm-text-muted">暂无选中岗位</div>';
+        return `
+          <div style="font-weight:700; font-size:15px; color:#0f172a;">${escapeHtml(job.title)}</div>
+          <div class="jm-text-muted" style="margin-top:6px;">${escapeHtml(job.company)} · 评分 ${job.score}</div>
+          <div class="jm-tag" style="margin-top:10px;">${escapeHtml(job.jd || '')}</div>
+        `;
+      }
+
+      function generateGreeting(job) {
+        const skills = job.jd ? job.jd.split(',').slice(0, 3).join('、') : '相关技能';
+        return `您好，我对贵司的「${job.title}」岗位非常感兴趣。我具备${skills}等经验，相信能快速上手。期待有机会进一步沟通，谢谢！`;
+      }
+
+      function renderRisk() {
+        const jobs = appData.jobs || [];
+        contentDiv.innerHTML = `
+          <div class="jm-section">
+            <div class="jm-section-title">⚠️ 企业风险提示</div>
+            <div class="jm-text-muted" style="margin-bottom:16px;">基于公开信息与招聘线索的客观提示，未知信息明确标记。</div>
+            ${jobs.map(job => `
+              <div class="jm-job-card">
+                <div class="jm-job-title">
+                  <span>${escapeHtml(job.title)}</span>
+                  <span class="jm-risk-tag">${job.risk === 'low' ? '低风险' : job.risk === 'unknown' ? '信息不全' : '需注意'}</span>
+                </div>
+                <div class="jm-job-company">${escapeHtml(job.company)}</div>
+                <div class="jm-text-muted" style="margin-top:8px; background:white; padding:8px; border-radius:6px;">${escapeHtml(job.riskNote || '暂无额外信息')}</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      function renderHistory() {
+        const jobs = appData.jobs || [];
+        contentDiv.innerHTML = `
+          <div class="jm-section">
+            <div class="jm-section-title">📋 岗位记录 <span class="jm-badge">本地保存</span></div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              ${jobs.map(job => `
+                <div class="jm-job-card">
+                  <div class="jm-job-title">
+                    <span>${escapeHtml(job.title)}</span>
+                    <span style="font-size:12px; color:#64748b; font-weight:normal;">${escapeHtml(job.company)}</span>
+                  </div>
+                  <div class="jm-flex" style="margin-top:12px; gap:6px;">
+                    <span class="jm-tag" style="background:${job.viewed ? '#dbeafe' : '#f1f5f9'}; color:${job.viewed ? '#1e40af' : '#64748b'};">已查看</span>
+                    <span class="jm-tag" style="background:${job.collected ? '#fef9c3' : '#f1f5f9'}; color:${job.collected ? '#854d0e' : '#64748b'};">已收藏</span>
+                    <span class="jm-tag" style="background:${job.applied ? '#dcfce7' : '#f1f5f9'}; color:${job.applied ? '#166534' : '#64748b'};">已投递</span>
+                    <span class="jm-tag" style="background:${job.contacted ? '#ede9fe' : '#f1f5f9'}; color:${job.contacted ? '#5b21b6' : '#64748b'};">已沟通</span>
+                  </div>
+                  <div style="display:flex; gap:8px; margin-top:16px;">
+                    <button class="jm-btn jm-btn-sm jm-mark-viewed" data-id="${job.id}">查看</button>
+                    <button class="jm-btn jm-btn-sm jm-mark-collected" data-id="${job.id}">收藏</button>
+                    <button class="jm-btn jm-btn-sm jm-mark-applied" data-id="${job.id}">投递</button>
+                    <button class="jm-btn jm-btn-sm jm-mark-contacted" data-id="${job.id}">沟通</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+
+        ['viewed', 'collected', 'applied', 'contacted'].forEach(action => {
+          document.querySelectorAll(`.jm-mark-${action}`).forEach(btn => {
+            btn.addEventListener('click', () => {
+              const job = appData.jobs.find(j => j.id === btn.dataset.id);
+              if (job) { job[action] = true; saveData(appData); renderHistory(); }
+            });
+          });
+        });
+      }
+
+      function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      if (!panel.classList.contains('jm-hidden')) renderContent();
+    })();
+  </script>
+</body>
+</html>
